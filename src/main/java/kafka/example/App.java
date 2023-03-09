@@ -87,32 +87,39 @@ public class App {
         consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "mahesh");
 
-        // creating consumer
-        Consumer<UUID, String> kafkaConsumer = new KafkaConsumer<>(consumerProps);
 
-        // subscribe to topic
-        kafkaConsumer.subscribe(Collections.singleton(TOPIC));
         Runnable consumerRunnable = new Runnable() {
             @Override
             public void run() {
+                LOGGER.log(Level.INFO,"Thread " + Thread.currentThread().getId() + " created. ");
+
+                // creating consumer
+                Consumer<UUID, String> kafkaConsumer = new KafkaConsumer<>(consumerProps);
+
+                // subscribe to topic
+                kafkaConsumer.subscribe(Collections.singleton(TOPIC));
+
                 while(true) {
                     ConsumerRecords<UUID, String> consumerRecords = kafkaConsumer.poll(Duration.ofMillis(100));
                     for (ConsumerRecord<UUID, String> consumerRecord : consumerRecords) {
-                        LOGGER.log(Level.INFO,consumerRecord.toString());
+                        LOGGER.log(Level.INFO,"consumer - " + Thread.currentThread().getId() + " : " + consumerRecord.toString());
                     }
-                    kafkaConsumer.commitSync();
+                    kafkaConsumer.commitSync(); //
                 }
             }
         };
 
         Thread producerThread = new Thread(producerRunnable);
-        Thread consumerThread = new Thread(consumerRunnable);
+        Thread consumerThread1 = new Thread(consumerRunnable);
+        Thread consumerThread2 = new Thread(consumerRunnable);
 
         producerThread.start();
-        consumerThread.start();
+        consumerThread1.start();
+        consumerThread2.start();
 
         producerThread.join();
-        consumerThread.join();
+        consumerThread1.join();
+        consumerThread2.join();
 
     }
 }
