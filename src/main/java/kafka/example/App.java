@@ -21,6 +21,35 @@ public class App {
     private final static Logger LOGGER = Logger.getGlobal();
     private final static String TOPIC = "test-topic";
 
+    private static void consumeMessageViaThisThread(){
+        long threadId = Thread.currentThread().getId();
+
+        // consumer properties
+
+        Properties consumerProps = new Properties();
+        consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,"localhost:9092");
+        consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, UUIDDeserializer.class);
+        consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG,"mahesh-" + threadId);
+        consumerProps.put(ConsumerConfig.CLIENT_ID_CONFIG,"mahesh-thread-" + threadId);
+
+        LOGGER.log(Level.INFO,"Thread " + threadId + " created. ");
+
+        // creating consumer
+        Consumer<UUID, String> kafkaConsumer = new KafkaConsumer<>(consumerProps);
+
+        // subscribe to topic
+        kafkaConsumer.subscribe(Collections.singleton(TOPIC));
+
+        while(true) {
+            ConsumerRecords<UUID, String> consumerRecords = kafkaConsumer.poll(Duration.ofMillis(100));
+            for (ConsumerRecord<UUID, String> consumerRecord : consumerRecords) {
+                LOGGER.log(Level.INFO,"consumer - " + threadId + " : " + consumerRecord.toString());
+            }
+            kafkaConsumer.commitSync(); //
+        }
+    }
+
     public static void main(String[] args) throws ExecutionException, InterruptedException {
 
         // properties
@@ -78,41 +107,24 @@ public class App {
             }
         };
 
-        // creating consumer thread
-
-        // consumer properties
-        Properties consumerProps = new Properties();
-        consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,"localhost:9092");
-        consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, UUIDDeserializer.class);
-        consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "mahesh");
-
-        // creating consumer
-        Consumer<UUID, String> kafkaConsumer = new KafkaConsumer<>(consumerProps);
-
-        // subscribe to topic
-        kafkaConsumer.subscribe(Collections.singleton(TOPIC));
         Runnable consumerRunnable = new Runnable() {
             @Override
             public void run() {
-                while(true) {
-                    ConsumerRecords<UUID, String> consumerRecords = kafkaConsumer.poll(Duration.ofMillis(100));
-                    for (ConsumerRecord<UUID, String> consumerRecord : consumerRecords) {
-                        LOGGER.log(Level.INFO,consumerRecord.toString());
-                    }
-                    kafkaConsumer.commitSync();
-                }
+                consumeMessageViaThisThread();
             }
         };
 
         Thread producerThread = new Thread(producerRunnable);
-        Thread consumerThread = new Thread(consumerRunnable);
+        Thread consumerThread1 = new Thread(consumerRunnable);
+        Thread consumerThread2 = new Thread(consumerRunnable);
 
-        producerThread.start();
-        consumerThread.start();
+        producerThread.start(); // creating producer thread
+        consumerThread1.start(); // creating consumer thread 1
+        consumerThread2.start(); // creating consumer thread 2
 
         producerThread.join();
-        consumerThread.join();
+        consumerThread1.join();
+        consumerThread2.join();
 
     }
 }
