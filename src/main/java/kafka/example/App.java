@@ -85,15 +85,16 @@ public class App {
         consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,"localhost:9092");
         consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, UUIDDeserializer.class);
         consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG, "mahesh");
-
 
         Runnable consumerRunnable = new Runnable() {
             @Override
             public void run() {
-                LOGGER.log(Level.INFO,"Thread " + Thread.currentThread().getId() + " created. ");
+                long threadId = Thread.currentThread().getId();
+
+                LOGGER.log(Level.INFO,"Thread " + threadId + " created. ");
 
                 // creating consumer
+                consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG,"mahesh-"+ threadId);
                 Consumer<UUID, String> kafkaConsumer = new KafkaConsumer<>(consumerProps);
 
                 // subscribe to topic
@@ -102,7 +103,7 @@ public class App {
                 while(true) {
                     ConsumerRecords<UUID, String> consumerRecords = kafkaConsumer.poll(Duration.ofMillis(100));
                     for (ConsumerRecord<UUID, String> consumerRecord : consumerRecords) {
-                        LOGGER.log(Level.INFO,"consumer - " + Thread.currentThread().getId() + " : " + consumerRecord.toString());
+                        LOGGER.log(Level.INFO,"consumer - " + threadId + " : " + consumerRecord.toString());
                     }
                     kafkaConsumer.commitSync(); //
                 }
