@@ -96,10 +96,11 @@ public class App {
             @Override
             public void run() {
                 while(true) {
-                    ConsumerRecords<UUID, String> consumerRecords = kafkaConsumer.poll(Duration.ofMillis(10000));
+                    ConsumerRecords<UUID, String> consumerRecords = kafkaConsumer.poll(Duration.ofMillis(100));
                     for (ConsumerRecord<UUID, String> consumerRecord : consumerRecords) {
-                        System.out.println(consumerRecord.toString());
+                        LOGGER.log(Level.INFO,consumerRecord.toString());
                     }
+                    kafkaConsumer.commitSync();
                 }
             }
         };
