@@ -1,5 +1,6 @@
 package kafka.example;
 
+import com.google.gson.Gson;
 import org.apache.kafka.clients.admin.*;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -9,15 +10,18 @@ import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.apache.kafka.common.serialization.UUIDDeserializer;
 import org.apache.kafka.common.serialization.UUIDSerializer;
-import org.json.simple.JSONObject;
 
+import java.io.FileNotFoundException;
+import java.io.Reader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class App {
+public class MockDebeziumCDCEmmiter {
     private final static Logger LOGGER = Logger.getGlobal();
     private final static String TOPIC = "test-topic";
 
@@ -42,15 +46,39 @@ public class App {
         kafkaConsumer.subscribe(Collections.singleton(TOPIC));
 
         while(true) {
-            ConsumerRecords<UUID, String> consumerRecords = kafkaConsumer.poll(Duration.ofMillis(100));
+            ConsumerRecords<UUID, String> consumerRecords = kafkaConsumer.poll(Duration.ofMillis(1000));
             for (ConsumerRecord<UUID, String> consumerRecord : consumerRecords) {
                 LOGGER.log(Level.INFO,"consumer - " + threadId + " : " + consumerRecord.toString());
             }
             kafkaConsumer.commitSync(); //
         }
     }
+    private static String loadJSONObjectFromFileIn(String absoluteDir) throws FileNotFoundException {
+        String json = "";
+        try {
+            // create Gson instance
+            Gson gson = new Gson();
 
-    public static void main(String[] args) throws ExecutionException, InterruptedException {
+            // create a reader
+            Reader reader = Files.newBufferedReader(Paths.get(absoluteDir));
+
+            // convert JSON file to map
+            json = gson.toJson(gson.fromJson(reader, Map.class));
+
+
+
+            // close reader
+            reader.close();
+
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+
+        return json;
+
+    }
+
+    public static void main(String[] args) throws ExecutionException, InterruptedException, FileNotFoundException {
 
         // properties
         Properties adminProps = new Properties();
@@ -90,17 +118,13 @@ public class App {
         Runnable producerRunnable = new Runnable() {
             @Override
             public void run() {
-                JSONObject jsonObject = new JSONObject();
-                jsonObject.put("firstName", "John");
-                jsonObject.put("lastName", "Smith");
-                jsonObject.put("age", 25);
-                jsonObject.put("address", "New York, New hampshire, Red Hack Road, USA.");
-                ProducerRecord<UUID, String> producerRecord = new ProducerRecord<>(TOPIC,UUID.randomUUID(),jsonObject.toJSONString());
                 while(true) {
                     try {
+
+                        ProducerRecord<UUID, String> producerRecord = new ProducerRecord<>(TOPIC,UUID.randomUUID(),loadJSONObjectFromFileIn("src/main/resources/MockDebeziumResponse.json"));
                         kafkaProducer.send(producerRecord);
                         Thread.sleep(1000);
-                    } catch (InterruptedException e) {
+                    } catch (InterruptedException | FileNotFoundException e) {
                         e.printStackTrace();
                     }
                 }
