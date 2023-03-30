@@ -23,7 +23,7 @@ import java.util.logging.Logger;
 
 public class MockDebeziumCDCEmmiter {
     private final static Logger LOGGER = Logger.getGlobal();
-    private final static String TOPIC = "test-topic";
+    private final static String TOPIC = "dbserver1.database.table";
 
     private static void consumeMessageViaThisThread(){
         long threadId = Thread.currentThread().getId();
@@ -114,15 +114,15 @@ public class MockDebeziumCDCEmmiter {
 
         // creating producer
         KafkaProducer<UUID, String> kafkaProducer = new KafkaProducer<>(producerProps);
-
         Runnable producerRunnable = new Runnable() {
             @Override
             public void run() {
                 while(true) {
                     try {
-
-                        ProducerRecord<UUID, String> producerRecord = new ProducerRecord<>(TOPIC,UUID.randomUUID(),loadJSONObjectFromFileIn("src/main/resources/MockDebeziumResponse.json"));
+                        String JSONStringMsg = loadJSONObjectFromFileIn("src/main/resources/MockDebeziumResponse.json");
+                        ProducerRecord<UUID, String> producerRecord = new ProducerRecord<>(TOPIC,UUID.randomUUID(),JSONStringMsg);
                         kafkaProducer.send(producerRecord);
+                        LOGGER.log(Level.INFO, "msg :" + JSONStringMsg + " sent.");
                         Thread.sleep(1000);
                     } catch (InterruptedException | FileNotFoundException e) {
                         e.printStackTrace();
@@ -143,12 +143,12 @@ public class MockDebeziumCDCEmmiter {
         Thread consumerThread2 = new Thread(consumerRunnable);
 
         producerThread.start(); // creating producer thread
-        consumerThread1.start(); // creating consumer thread 1
-        consumerThread2.start(); // creating consumer thread 2
+//        consumerThread1.start(); // creating consumer thread 1
+//        consumerThread2.start(); // creating consumer thread 2
 
         producerThread.join();
-        consumerThread1.join();
-        consumerThread2.join();
+//        consumerThread1.join();
+//        consumerThread2.join();
 
     }
 }
