@@ -1,6 +1,7 @@
 package kafka.example;
 
 import com.google.gson.Gson;
+import com.google.gson.internal.LinkedTreeMap;
 import org.apache.kafka.clients.admin.*;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -22,8 +23,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class MockDebeziumCDCEmmiter {
+    private final static String EVENT_JSON_MSG_DIR = "src/main/resources/MockDebeziumResponse.json";
+    private final static String SERVER_PLUS_PORT = "10.8.100.246:9092";
     private final static Logger LOGGER = Logger.getGlobal();
-    private final static String TOPIC = "dbserver1.database.table";
+    private final static String TOPIC = "dbserver1.inventory.tableA";
 
     private static void consumeMessageViaThisThread(){
         long threadId = Thread.currentThread().getId();
@@ -56,18 +59,11 @@ public class MockDebeziumCDCEmmiter {
     private static String loadJSONObjectFromFileIn(String absoluteDir) throws FileNotFoundException {
         String json = "";
         try {
-            // create Gson instance
             Gson gson = new Gson();
-
-            // create a reader
             Reader reader = Files.newBufferedReader(Paths.get(absoluteDir));
-
-            // convert JSON file to map
-            json = gson.toJson(gson.fromJson(reader, Map.class));
-
-
-
-            // close reader
+            Map map = gson.fromJson(reader, Map.class);
+            Object put = ((LinkedTreeMap) ((LinkedTreeMap) map.get("payload")).get("after")).put("eventTimestamp", System.currentTimeMillis());
+            json = gson.toJson(map);
             reader.close();
 
         } catch (Exception ex) {
@@ -82,7 +78,7 @@ public class MockDebeziumCDCEmmiter {
 
         // properties
         Properties adminProps = new Properties();
-        adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,"localhost:9092"); // if not working set listeners in kafka/config/server to listeners=PLAINTEXT://localhost:9092
+        adminProps.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,SERVER_PLUS_PORT); // if not working set listeners in kafka/config/server to listeners=PLAINTEXT://localhost:9092
 
         // create kafka admin with given props
         Admin kafkaAdmin = KafkaAdminClient.create(adminProps);
@@ -108,25 +104,22 @@ public class MockDebeziumCDCEmmiter {
 
         // producer props
         Properties producerProps = new Properties();
-        producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,"localhost:9092");
+        producerProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG,SERVER_PLUS_PORT);
         producerProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, UUIDSerializer.class);
         producerProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
 
         // creating producer
         KafkaProducer<UUID, String> kafkaProducer = new KafkaProducer<>(producerProps);
-        Runnable producerRunnable = new Runnable() {
-            @Override
-            public void run() {
-                while(true) {
-                    try {
-                        String JSONStringMsg = loadJSONObjectFromFileIn("src/main/resources/MockDebeziumResponse.json");
-                        ProducerRecord<UUID, String> producerRecord = new ProducerRecord<>(TOPIC,UUID.randomUUID(),JSONStringMsg);
-                        kafkaProducer.send(producerRecord);
-                        LOGGER.log(Level.INFO, "msg :" + JSONStringMsg + " sent.");
-                        Thread.sleep(1000);
-                    } catch (InterruptedException | FileNotFoundException e) {
-                        e.printStackTrace();
-                    }
+        Runnable producerRunnable = () -> {
+            while(true) {
+                try {
+                    String JSONStringMsg = loadJSONObjectFromFileIn(EVENT_JSON_MSG_DIR);
+                    ProducerRecord<UUID, String> producerRecord = new ProducerRecord<>(TOPIC,UUID.randomUUID(),JSONStringMsg);
+                    kafkaProducer.send(producerRecord);
+                    Thread.sleep(1000); // msg rate limiter
+                    LOGGER.log(Level.INFO, "msg :" + JSONStringMsg + " sent.");
+                } catch (InterruptedException | FileNotFoundException e) {
+                    e.printStackTrace();
                 }
             }
         };
