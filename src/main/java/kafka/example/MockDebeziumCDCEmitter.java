@@ -22,17 +22,17 @@ import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class MockDebeziumCDCEmmiter {
-    private final static String EVENT_JSON_MSG_DIR = "src/main/resources/MockDebeziumResponse.json";
+public class MockDebeziumCDCEmitter {
     private final static String SERVER_PLUS_PORT = "10.8.100.246:9092";
+    private final static String EVENT_JSON_MSG_DIR = "src/main/resources/MockDebeziumResponse.json";
     private final static Logger LOGGER = Logger.getGlobal();
-    private final static String TOPIC = "dbserver1.inventory.tableA";
+    private final static String TOPIC = "dbserver1.database.tableA";
+    private final static long RATE_LIMIT = 1000;
 
     private static void consumeMessageViaThisThread(){
         long threadId = Thread.currentThread().getId();
 
         // consumer properties
-
         Properties consumerProps = new Properties();
         consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,"localhost:9092");
         consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, UUIDDeserializer.class);
@@ -116,9 +116,9 @@ public class MockDebeziumCDCEmmiter {
                     String JSONStringMsg = loadJSONObjectFromFileIn(EVENT_JSON_MSG_DIR);
                     ProducerRecord<UUID, String> producerRecord = new ProducerRecord<>(TOPIC,UUID.randomUUID(),JSONStringMsg);
                     kafkaProducer.send(producerRecord);
-                    Thread.sleep(1000); // msg rate limiter
+                    Thread.sleep(RATE_LIMIT); // msg rate limiter
                     LOGGER.log(Level.INFO, "msg :" + JSONStringMsg + " sent.");
-                } catch (InterruptedException | FileNotFoundException e) {
+                } catch (FileNotFoundException | InterruptedException e) {
                     e.printStackTrace();
                 }
             }
