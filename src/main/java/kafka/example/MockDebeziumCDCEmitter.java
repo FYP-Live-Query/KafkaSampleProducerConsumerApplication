@@ -26,7 +26,6 @@ public class MockDebeziumCDCEmitter {
     private final static String SERVER_PLUS_PORT = "10.8.100.246:9092";
     private final static String EVENT_JSON_MSG_DIR = "src/main/resources/MockDebeziumResponse.json";
     private final static Logger LOGGER = Logger.getGlobal();
-    private final static String TOPIC = "dbserver1.database.tableA";
     private final static long RATE_LIMIT = 1000;
 
     private static void consumeMessageViaThisThread(){
@@ -34,7 +33,7 @@ public class MockDebeziumCDCEmitter {
 
         // consumer properties
         Properties consumerProps = new Properties();
-        consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,"localhost:9092");
+        consumerProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,SERVER_PLUS_PORT);
         consumerProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, UUIDDeserializer.class);
         consumerProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         consumerProps.put(ConsumerConfig.GROUP_ID_CONFIG,"mahesh-" + threadId);
@@ -56,11 +55,11 @@ public class MockDebeziumCDCEmitter {
             kafkaConsumer.commitSync(); //
         }
     }
-    private static String loadJSONObjectFromFileIn(String absoluteDir) throws FileNotFoundException {
+    private static String loadJSONObjectFromFileIn() throws FileNotFoundException {
         String json = "";
         try {
             Gson gson = new Gson();
-            Reader reader = Files.newBufferedReader(Paths.get(absoluteDir));
+            Reader reader = Files.newBufferedReader(Paths.get(MockDebeziumCDCEmitter.EVENT_JSON_MSG_DIR));
             Map map = gson.fromJson(reader, Map.class);
             Object put = ((LinkedTreeMap) ((LinkedTreeMap) map.get("payload")).get("after")).put("eventTimestamp", System.currentTimeMillis());
             json = gson.toJson(map);
@@ -74,6 +73,7 @@ public class MockDebeziumCDCEmitter {
 
     }
 
+    private final static String TOPIC = "dbserver1.inventory.networkTraffic";
     public static void main(String[] args) throws ExecutionException, InterruptedException, FileNotFoundException {
 
         // properties
@@ -113,7 +113,7 @@ public class MockDebeziumCDCEmitter {
         Runnable producerRunnable = () -> {
             while(true) {
                 try {
-                    String JSONStringMsg = loadJSONObjectFromFileIn(EVENT_JSON_MSG_DIR);
+                    String JSONStringMsg = loadJSONObjectFromFileIn();
                     ProducerRecord<UUID, String> producerRecord = new ProducerRecord<>(TOPIC,UUID.randomUUID(),JSONStringMsg);
                     kafkaProducer.send(producerRecord);
                     Thread.sleep(RATE_LIMIT); // msg rate limiter
